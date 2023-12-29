@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <base target="_top">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+
+  <style>
+
+    div.catlist {
+      max-height: 280px;
+      overflow: auto;
+    }
+    .cat-row {
+      padding: 2px;
+      border: 1px solid lightgrey;
+      margin-bottom: 3px;
+      display: flex;
+      flex-flow: row;
+    }
+
+    .cat-row div,
+    .cat-row button {
+      margin: 2px;
+    }
+
+    #buttons {
+      position: fixed;
+      bottom: 5px;
+      width: 100%;
+      display: flex;
+      flex-flow: row;
+      justify-content: space-evenly;
+    }
+
+    /* spinner */
+    .overlay {
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      position: fixed;
+      background: #222;
+      opacity: .6;
+      z-index: 2;
+    }
+
+    .overlay__inner {
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      position: absolute;
+    }
+
+    .overlay__content {
+      left: 50%;
+      position: absolute;
+      top: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    .spinner {
+      width: 75px;
+      height: 75px;
+      display: inline-block;
+      border-width: 2px;
+      border-color: rgba(255, 255, 255, 0.05);
+      border-top-color: #fff;
+      animation: spin 1s infinite linear;
+      border-radius: 100%;
+      border-style: solid;
+    }
+
+    @keyframes spin {
+      100% {
+        transform: rotate(360deg);
+      }
+    }
+  </style>
+  <script>
+    function toggleOverlay() {
+        const overlay = document.getElementById("overlay-parent");
+
+          if (overlay.style.display == "none") {
+            overlay.style.display = "block";
+          } else {
+            overlay.style.display = "none";
+          }
+    }
+
+    const mode = <?!= JSON.stringify(mode) ?>;
+    document.addEventListener('DOMContentLoaded', buildCatList);
+
+    function buildCatList() {
+
+    const cats = <?!= cats ?>;
+
+      for (var i = 0; i < cats.length; i++) {
+        
+        const currIndex = i;
+        const par = document.createElement('div');
+        par.setAttribute("id", "cat-" + i);
+        par.setAttribute("class", "cat-row");
+
+        const up = document.createElement('button');
+        up.classList.add("up", "reorder");
+        up.innerText = "🔼";
+        up.onclick = function() {moveUp("cat-" + currIndex)};
+        par.appendChild(up);
+
+        const down = document.createElement('button');
+        down.classList.add("down", "reorder");
+        down.innerText = "🔽";
+        down.onclick = function() {moveDown("cat-" + currIndex)};
+        par.appendChild(down);
+
+        const edit = document.createElement('button');
+        edit.classList.add("edit", "rename");
+        edit.innerText = "✏️";
+        edit.onclick = function() {sendToRenaming(cats[currIndex])};
+        par.appendChild(edit);
+
+        const remove = document.createElement('button');
+        remove.classList.add("delete", "remove");
+        remove.innerText = "🗑️";
+        remove.onclick = function() {sendToRemoval(cats[currIndex])};
+        par.appendChild(remove);
+
+        const text = document.createElement('div');
+        text.classList.add("name");
+        text.innerText = cats[i];
+        text.style.marginLeft = "10px";
+        par.appendChild(text);
+
+        document.getElementById("cats-list").appendChild(par);
+
+      }
+
+      adaptToMode();
+    }
+
+    function adaptToMode() {
+
+      const modes = ["remove", "reorder", "rename"];
+      for (i in modes) {
+        if (modes[i] != mode) {
+          console.log("Checking mode: " + modes[i])
+          const items = document.querySelectorAll("." + modes[i]);
+          console.log(items)
+          for (let x = 0; x < items.length; x++) {
+            items[x].style.display = "none";
+          }
+        }
+        if ((modes[i] == mode) && (mode == "reorder")) {reCalcArrows()};
+      }
+    }
+
+    function reCalcArrows() {
+      const items = document.getElementById("cats-list").children;
+      console.log(items)
+      for (let i = 0; i < items.length; i++) {
+        console.log("Current item: " + items[i])
+        i == 0 ? items[i].querySelector(".up").style.visibility = "hidden" : items[i].querySelector(".up").style.visibility = "visible";
+        i == items.length - 1 ? items[i].querySelector(".down").style.visibility = "hidden" : items[i].querySelector(".down").style.visibility = "visible";
+      }
+    }
+
+    function moveUp(index) {
+      const element = document.getElementById(index);
+      element.parentNode.insertBefore(element, element.previousElementSibling);
+      reCalcArrows()
+    }
+    function moveDown(index) {
+      const element = document.getElementById(index);
+      element.parentNode.insertBefore(element.nextElementSibling, element);
+      reCalcArrows()
+    }
+    function getNewArray() {
+      const elementChildren = document.getElementById("cats-list").children;
+      let arr = [];
+      for (let i = 0; i < elementChildren.length; i++) {
+        console.log(elementChildren[i])
+        arr[i] = elementChildren[i].querySelector(".name").innerText;
+      }
+      console.log(arr)
+      return arr;
+    }
+
+    function sendCatsForReordering() {
+      toggleOverlay();
+      const arr = JSON.stringify(getNewArray());
+      try {
+        google.script.run.withSuccessHandler(asyncReady).withFailureHandler(onFailure).reOrderDailyCats(arr);
+      } catch(e) {
+        toggleOverlay();
+        M.toast({html: e, displayLength: 3000})
+      }
+    }
+
+    function onFailure(e) {
+      toggleOverlay();
+      M.toast({html: e, displayLength: 3000});
+    }
+
+    function asyncReady(returnedValue) {
+        if (returnedValue) {
+          console.log(returnedValue);
+          google.script.host.close();
+      }
+    }
+
+    function sendToRemoval(name) {
+      toggleOverlay();
+      console.log("Sent to removal: " + name)
+      try {
+        google.script.run.withFailureHandler(onFailure).uiCatRemoveFormLaunch(JSON.stringify(name))
+      } catch(e) {
+        toggleOverlay();
+        M.toast({html: e, displayLength: 3000})
+      }
+    }
+
+    function sendToRenaming(oldName) {
+      toggleOverlay();
+      console.log("Old name is " + oldName)
+      try {
+        google.script.run.withFailureHandler(onFailure).uiNameChangeFormLaunch(JSON.stringify(oldName))
+      } catch(e) {
+        toggleOverlay();
+        M.toast({html: e, displayLength: 3000})
+      }
+    }
+
+  </script>
+
+</head>
+
+<body>
+
+  <div class="overlay" id="overlay-parent" style="display: none;">
+    <div class="overlay__inner">
+      <div class="overlay__content"><span class="spinner"></span></div>
+    </div>
+  </div>
+
+  <p class="reorder">Choose the desired order of categories and press "Apply".</p>
+  <p class="rename">Choose the category to rename.</p>
+  <p class="remove">Choose the category to remove.</p>
+  <div id="cats-list" class="catlist"> </div>
+  <div id="buttons">
+    <button class="reorder btn waves-effect waves-light" onclick="sendCatsForReordering()">Apply</button>
+  </div>
+
+</body>
+
+</html>

@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <base target="_top">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+  <style>
+    .buttons {
+      position: fixed;
+      bottom: 5px;
+      width: 100%;
+      display: flex;
+      flex-flow: row;
+      justify-content: space-evenly;
+    }
+
+    /* spinner */
+    .overlay {
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      position: fixed;
+      background: #222;
+      opacity: .6;
+      z-index: 2;
+    }
+
+    .overlay__inner {
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      position: absolute;
+    }
+
+    .overlay__content {
+      left: 50%;
+      position: absolute;
+      top: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    .spinner {
+      width: 75px;
+      height: 75px;
+      display: inline-block;
+      border-width: 2px;
+      border-color: rgba(255, 255, 255, 0.05);
+      border-top-color: #fff;
+      animation: spin 1s infinite linear;
+      border-radius: 100%;
+      border-style: solid;
+    }
+
+    @keyframes spin {
+      100% {
+        transform: rotate(360deg);
+      }
+    }
+  </style>
+
+  <script>
+    const cat = <?!= JSON.stringify(cat) ?>;
+    const quantity = <?!= JSON.stringify(quantity) ?>;
+    const cats = <?!= JSON.stringify(cats) ?>;
+    document.addEventListener('DOMContentLoaded', removeUnneeded);
+
+    function removeUnneeded() {
+
+      let blockToShow;
+      if (quantity) { blockToShow = document.getElementById("somelogs") }
+      else { blockToShow = document.getElementById("nologs") };
+      blockToShow.style.display = "block";
+
+    }
+
+
+    function toggleOverlay() {
+      const overlay = document.getElementById("overlay-parent");
+
+      if (overlay.style.display == "none") {
+        overlay.style.display = "block";
+      } else {
+        overlay.style.display = "none";
+      }
+      //google.script.host.close()
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+      var elems = document.querySelectorAll('select');
+      var instances = M.FormSelect.init(elems);
+      for (let i = 0; i < instances.length; i++) {
+        instances[i].selectedIndex = -1;
+      }
+    });
+
+    function catChosen() {
+      console.log("Category chosen");
+      document.getElementById("buttons").style.display = "flex";
+    }
+
+    function passSelect() {
+      const form = document.getElementById("cats_dropdown");
+      runReplacement(form);
+    }
+
+    function runReplacement(form) {
+
+      toggleOverlay();
+
+      if (!form) { // nothing to replace
+        runRemoval();
+      } else {
+
+        const catToDelete = cat;
+        const catToReplaceWith = cats[form.value];
+
+        try {
+          google.script.run.withFailureHandler(onFailure).withSuccessHandler(runRemoval).replaceSubCatInAllLogs(catToDelete, catToReplaceWith, true);
+        } catch(e) {
+          toggleOverlay();
+          M.toast({html: e, displayLength: 3000})
+        }
+      }
+    }
+
+    function onFailure(e) {
+      toggleOverlay();
+      M.toast({html: e, displayLength: 3000});
+    }
+
+    function runRemoval() {
+      google.script.run.withSuccessHandler(trackSuccess).withFailureHandler(onFailure).removeDailySubCat(cat);
+    }
+
+    function trackSuccess(returned) {
+      if (returned) {
+        console.log("Removed successfully");
+        google.script.host.close();
+      }
+    }
+
+  </script>
+</head>
+
+<body>
+
+  <div class="overlay" id="overlay-parent" style="display: none;">
+    <div class="overlay__inner">
+      <div class="overlay__content"><span class="spinner"></span></div>
+    </div>
+  </div>
+
+  <p>You want to remove category "<?= cat ?>". Understandable.
+  </p>
+
+  <div id="somelogs" style="display: none;">
+    <p>At this time, there are <b><?= quantity ?></b> log entries with this category. Choose a category down below and all those entried will be migrated to the chosen category. </p>
+    <p style="color: red;">This process can not be reversed.</p>
+    <p>Otherwise, you can close this window and do the reassigning manually on "Expense log" page.</p>
+
+    <select name="cats" id="cats_dropdown" onchange="catChosen()">
+      <option disabled selected value></option>
+      <? for (let i = 0; i < cats.length; i++) { ?>
+      <option value=<?=i ?> >
+        <?= cats[i] ?>
+      </option>
+      <? } ?>
+    </select>
+    <div class="buttons" id="buttons" style="display: none;">
+      <button class="btn waves-effect waves-light" onclick="passSelect()"><i class="material-icons left">delete</i>Replace & remove</button>
+    </div>
+  </div>
+
+  <div id="nologs" style="display: none;">
+    <p>At this time, there are no log entries with this category. Which means it's probably safe to remove it.</p>
+    <p>Still, excercise caution as this can not be reversed. One button push and this category will be wiped off for
+      good.</p>
+
+    <div class="buttons">
+      <button class="btn waves-effect waves-light" onclick="runReplacement()"><i class="material-icons left">delete</i>Remove</button>
+    </div>
+  </div>
+
+</body>
+
+</html>

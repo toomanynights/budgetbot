@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <base target="_top">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+  <script type="module" src="https://cdn.jsdelivr.net/npm/emoji-picker-element@^1/index.js"></script>
+  <style>
+    #buttons {
+      position: fixed;
+      bottom: 5px;
+      width: 100%;
+      display: flex;
+      flex-flow: row;
+      justify-content: space-evenly;
+    }
+
+    /* emoji */
+    .tooltip:not(.shown) {
+      display: none;
+    }
+
+    .tooltip {
+      position: absolute;
+      top: auto !important;
+      right: 0;
+      left: 0;
+      bottom: 0;
+      transform: none !important;
+      width: 315;
+      height: 210px;
+    }
+
+      .emoji-picker {
+        width: 100%;
+        height: 100%;
+      }
+
+      .text-and-emoji {
+        display: flex;
+        flex-flow: row;
+        width: 100%;
+        gap: 10px;
+      }
+
+      #picker {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        width: 35px;
+        height: 35px;
+        margin: auto;
+        border: 1px solid lightgray;
+        border-radius: 10px;
+        cursor: pointer;
+        user-select: none;
+      }
+
+      .picker-clicked {
+        background: lightgray;
+      }
+      
+
+    /* spinner */
+    .overlay {
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      position: fixed;
+      background: #222;
+      opacity: .5;
+      z-index: 2;
+    }
+
+    .overlay__inner {
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      position: absolute;
+    }
+
+    .overlay__content {
+      left: 50%;
+      position: absolute;
+      top: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    .spinner {
+      width: 75px;
+      height: 75px;
+      display: inline-block;
+      border-width: 2px;
+      border-color: rgba(255, 255, 255, 0.05);
+      border-top-color: #fff;
+      animation: spin 1s infinite linear;
+      border-radius: 100%;
+      border-style: solid;
+    }
+
+    @keyframes spin {
+      100% {
+        transform: rotate(360deg);
+      }
+    }
+  </style>
+  <script>
+    const old = <?!= JSON.stringify(oldName) ?>;
+
+    function toggleOverlay() {
+        const overlay = document.getElementById("overlay-parent");
+
+          if (overlay.style.display == "none") {
+            overlay.style.display = "block";
+          } else {
+            overlay.style.display = "none";
+          }
+        //google.script.host.close()
+    }
+
+  </script>
+</head>
+
+<body>
+
+  <div class="overlay" id="overlay-parent" style="display: none;">
+    <div class="overlay__inner">
+      <div class="overlay__content"><span class="spinner"></span></div>
+    </div>
+  </div>
+
+  <p>Provide a name for this category. Make sure it has an emoji (at the beginning works best).</p>
+  <form id="nameChangeForm" onsubmit="event.preventDefault(); figureOutType(this)">
+    <div class="text-and-emoji">
+      <input type="text" name="cat" required id="nameField" value=<?!= oldName ?>>
+      <div id="picker">
+        <span>😏</span>
+      </div>
+    </div>
+
+    <div class="tooltip" role="tooltip">
+      <emoji-picker class="emoji-picker"></emoji-picker>
+    </div>
+
+    <div id="buttons">
+      <button type="submit" value="Submit" class="btn waves-effect waves-light" >Submit</button>
+    </div>
+  </form>
+
+  <script>
+
+    function removeEmoji(str) {
+
+      console.log("removeEmoji received " + str);
+      str = String(str);
+
+      const emojiRegExp = new RegExp(/(\p{EPres}|\p{ExtPict})(\u200d(\p{EPres}|\p{ExtPict}))*/gu);
+      const emoji = str.match(emojiRegExp) ? str.match(emojiRegExp)[0] : null;
+      const cleanStr = str.replaceAll(emojiRegExp, "").replaceAll(/[^ -~]+/g, "").trim();
+
+      return [cleanStr, emoji, str]
+    }
+
+
+    function figureOutType(form) {
+      
+      toggleOverlay();
+      if (old) { // this is renaming
+        const oldParsed = JSON.parse(old);
+        if (oldParsed == form.cat.value) { // nothing to do here
+          console.log("There was old name but it wasn't changed " + oldParsed)
+          google.script.host.close();
+
+        } else {
+          console.log("There was old name and it was changed " + [oldParsed, form.cat.value])
+        }
+
+      } else {// this is creation
+        console.log("There was no old name " + form.cat.value)
+      };
+                
+      try {
+        google.script.run.withSuccessHandler(performValidations).withFailureHandler(onFailure).checkIfCatExists(form.cat.value);
+      } catch(e) {
+        toggleOverlay();
+        M.toast({html: e, displayLength: 3000})
+      }
+    }
+
+    function performValidations(returned) {
+
+      console.log(returned)
+
+      if (returned[0] == "no_emoji") {
+        M.toast({html: "Just one emoji. Please.", displayLength: 1000})
+        toggleOverlay();
+        return;
+      };
+      if (returned[0] == "full_exists") {
+        M.toast({html: "This looks too familiar. Pick a different name. And emoji.", displayLength: 1500})
+        toggleOverlay();
+        return;
+      };
+      if (returned[0] == "short_exists") {
+        if (old) {
+          const oldShort = removeEmoji(JSON.parse(old))[0].toLowerCase();
+          const newShort = removeEmoji(returned[1])[0].toLowerCase();
+          console.log([newShort, oldShort])
+          if (oldShort != newShort) { // there is an old cat, and the new one is a text duplicate of some other cat
+            M.toast({html: "A complicated scheme. Looks like you're trying to rename the wrong category.", displayLength: 2000})
+            toggleOverlay();
+            return;
+          }
+          console.log("Just changed emoji for a cat"); // this is not a blocker, can proceed
+        } else {
+          console.log(returned[0], returned[1]) // there is no old cat, but new one is a text duplicate of some other cat
+          M.toast({html: "Changed emoji is something, but the texts should differ too.", displayLength: 1500})
+          toggleOverlay();
+          return;
+        }
+      };
+      if (returned[0] == "other_exists") {
+        console.log("Cat exists somewhere")
+        M.toast({html: "If you don't want the universe to explode, pick some other name.", displayLength: 2000})
+        toggleOverlay();
+        return;
+      }
+
+      if (old) { // this is renaming
+        const oldParsed = JSON.parse(old);
+        google.script.run.withSuccessHandler(trackSuccess).withFailureHandler(onFailure).renameDailyCat(oldParsed, returned[1]);
+        
+      } else {
+        google.script.run.withFailureHandler(onFailure).withSuccessHandler(trackSuccess).addNewDailyCat(returned[1]);
+      }
+    }
+
+    function trackSuccess(returned) {
+
+      if (returned) {
+        console.log("Created / renamed successfully");
+        google.script.host.close();
+      }
+
+    }
+
+    function onFailure(e) {
+      toggleOverlay();
+      M.toast({html: e, displayLength: 3000});
+    }
+  </script>
+
+  <script type="module">
+    import 'https://cdn.jsdelivr.net/npm/emoji-picker-element@^1/index.js'
+    import insertText from 'https://cdn.jsdelivr.net/npm/insert-text-at-cursor@0.3.0/index.js'
+
+  document.querySelector('emoji-picker').addEventListener('emoji-click', e => {
+    insertText(document.querySelector('input'), e.detail.unicode)
+  })
+  </script>
+
+  <script type="module">
+    import * as Popper from 'https://cdn.jsdelivr.net/npm/@popperjs/core@^2/dist/esm/index.js'
+    const button = document.querySelector('#picker')
+    const tooltip = document.querySelector('.tooltip')
+    Popper.createPopper(button, tooltip)
+
+  document.querySelector('#picker').onclick = () => {
+    tooltip.classList.toggle('shown');
+    document.querySelector('#picker').classList.toggle("picker-clicked");
+  }
+  </script>
+
+</body>
+
+</html>

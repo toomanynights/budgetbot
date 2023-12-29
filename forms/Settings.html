@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <base target="_top">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+  <script>
+    function toggleOverlay() {
+      const overlay = document.getElementById("overlay-parent");
+
+      if (overlay.style.display == "none") {
+        overlay.style.display = "block";
+      } else {
+        overlay.style.display = "none";
+      }
+      //google.script.host.close()
+    }
+
+    
+  </script>
+  <style>
+    .inline-icon {
+      vertical-align: bottom;
+      font-size: 18px !important;
+      cursor: help;
+    }
+
+    #buttons {
+      position: fixed;
+      bottom: 5px;
+      width: 100%;
+      display: flex;
+      flex-flow: row;
+      justify-content: space-evenly;
+    }
+
+    /* spinner */
+    .overlay {
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      position: fixed;
+      background: #222;
+      opacity: .6;
+      z-index: 2;
+    }
+
+    .overlay__inner {
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      position: absolute;
+    }
+
+    .overlay__content {
+      left: 50%;
+      position: absolute;
+      top: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    .overlay__inner p {
+      color: white;
+      text-align: center;
+      margin-top: 320px;
+      background: black;
+    }
+
+    .spinner {
+      width: 75px;
+      height: 75px;
+      display: inline-block;
+      border-width: 2px;
+      border-color: rgba(255, 255, 255, 0.05);
+      border-top-color: #fff;
+      animation: spin 1s infinite linear;
+      border-radius: 100%;
+      border-style: solid;
+    }
+
+    #settingsform {
+      display: flex;
+      flex-flow: wrap;
+      justify-content: space-evenly;
+    }
+
+    form > div {
+      width: 45%;
+    }
+
+    @keyframes spin {
+      100% {
+        transform: rotate(360deg);
+      }
+    }
+  </style>
+</head>
+
+<script>
+
+  const setts = JSON.parse(<?= JSON.stringify(setts) ?>).filter(x => x[0])
+  const settsOriginal = JSON.parse(<?= JSON.stringify(setts) ?>)
+
+  Date.prototype.clearTime = function () {
+    var date = new Date(this.valueOf());
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  }
+
+  Date.prototype.dateToInput = function () {
+    return this.getFullYear() + '-' + ('0' + (this.getMonth() + 1)).substr(-2, 2) + '-' + ('0' + this.getDate()).substr(-2, 2);
+  }
+
+  function inputToDate(str) {
+
+    str = str + "";
+    const newStr = str.split("-");
+    const newDate = new Date(newStr[0], newStr[1] - 1, newStr[2]);
+    return newDate;
+
+  }
+  
+  document.addEventListener('DOMContentLoaded', function() {
+    var elems = document.querySelectorAll('.datepicker');
+    let firstDate = new Date(setts.find(x => x[0] == "First date")[1]);
+    const firstDateFormatted = firstDate ? new Date(firstDate).dateToInput() : "";
+    let options = {
+      autoClose: "true",
+      format: "yyyy-mm-dd",
+      defaultDate: firstDate ? firstDate : "",
+      setDefaultDate: firstDate ? "true" : "false",
+      firstDay: 1
+    }
+    var instances = M.Datepicker.init(elems, options);
+
+  });
+
+  document.addEventListener('DOMContentLoaded', modifyInputs);
+
+  function modifyInputs() {
+    for (let i = 0; i < setts.length; i++) {
+      const elem = document.getElementById(i);
+      if (setts[i][2] == "decimal") {
+        elem.step = "0.1";
+      }
+      if (setts[i][2] == "date") {
+        if (setts[i][1] == "") {
+          console.log("There was no date")
+          elem.value = ""
+        } else {
+          console.log("There was a date " + setts[i][1] + ", now it's " + new Date(setts[i][1]).dateToInput())
+          elem.value = new Date(setts[i][1]).dateToInput()
+        }
+      }
+      if ((setts[i][0] != "Telegram chat ID") && (setts[i][2] != "datalist")) {
+        elem.required = true;
+      }
+      if (setts[i][2] == "datalist") {
+        const arrayOfCurrencies = [ "$", "€", "₽" ];
+        arrayOfCurrencies.forEach(function(item) {
+          let option = document.createElement('option');
+          option.value = item;
+          option.innerText = item;
+          elem.appendChild(option);
+        })
+      }
+      if (setts[i][0] == "Currency") {
+        elem.value = setts[i][1];
+      }
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    var elems = document.querySelectorAll('select');
+    var instances = M.FormSelect.init(elems);
+  });
+
+  function resetToDefaults() {
+    for (let i = 0; i < setts.length; i++) {
+      const elem = document.getElementById(i);
+      if (setts[i][2] == "date") {
+        elem.value = new Date(setts[i][4]).dateToInput()
+      } else {
+        elem.value = setts[i][4];
+      }
+    }
+  }
+
+  function processForm(form) {
+
+    const settsNew = settsOriginal;
+    let changeCounter = 0;
+
+    const formData = new FormData(form);
+    const formDataObj = Object.fromEntries(formData);
+    const selectIndex = settsNew.findIndex(x => x[0] == "Currency");
+    const selectValue = document.getElementById(selectIndex).value;
+
+    for (let i = 0; i < setts.length; i++) {
+
+      let val = formDataObj[i];
+      let prev = settsNew[i][1];
+      let diff;
+
+      if (settsNew[i][2] == "date") {
+
+        console.log(val)
+        const newDate = inputToDate(val);
+
+        if (!prev) {diff = true}
+        else {
+          prev = new Date(setts[i][1]);
+          if (newDate.valueOf() - prev.valueOf() != 0) {diff = true}
+        }
+      } else if (i == selectIndex) {
+        val = selectValue;
+        if (!val) {
+          M.toast({html: "Please select currency.", displayLength: 1000});
+          return}
+        diff = !(val == prev);
+      } else {
+        diff = val - prev;
+      }
+
+      if (diff) { changeCounter = changeCounter + 1 };
+
+      if (settsNew[i][2] == "decimal") {
+
+        settsNew[i][1] = Number(val);
+
+      } else if (settsNew[i][2] == "date") {
+
+        // settsNew[i][1] = new Date(settsNew[i][1]).clearTime().dateToInput()
+        // if (settsNew[i][4] != "") {settsNew[i][4] = new Date(settsNew[i][4]).clearTime().dateToInput()}
+        // else {settsNew[i][4] = new Date(settsNew[i][1]).clearTime().dateToInput()}
+        settsNew[i][1] = val;
+        if (settsNew[i][4] == "") {settsNew[i][4] = val};
+
+      } else {
+        settsNew[i][1] = val;
+      }
+
+    }
+    console.log(settsNew)
+
+    const applied = "<?= applied ?>";    
+    console.log(applied);
+    if ((changeCounter) || (applied !== "true")) {
+      toggleOverlay();
+      try {
+        google.script.run.withSuccessHandler(asyncReady).withFailureHandler(onFailure).processSettingsChanges(JSON.stringify(settsNew));
+      } catch(e) {
+        toggleOverlay();
+        M.toast({html: e, displayLength: 3000})
+      }
+
+    } else {
+      console.log("Settings weren't changed");
+      google.script.host.close();
+    }
+  }
+
+  function onFailure(e) {
+      toggleOverlay();
+      M.toast({html: e, displayLength: 3000});
+    }
+
+  function asyncReady(returnedValue) {
+    if (returnedValue) {
+      console.log("Settings applied successfully");
+      google.script.host.close();
+    }
+  }
+
+  function test() {
+    
+    const form = document.getElementById("settingsform")
+
+    const formData = new FormData(form);
+    const formDataObj = Object.fromEntries(formData);
+
+    console.log([formData, formDataObj])
+  }
+</script>
+
+<body>
+
+  <div class="overlay" id="overlay-parent" style="display: none">
+    <div class="overlay__inner">
+      <p style="color: white;">Applying settings may take a minute.<br>Don't fret, it's happening.</p>
+      <div class="overlay__content"><span class="spinner"></span></div>
+    </div>
+  </div>
+
+  <form onsubmit="processForm(this)" id="settingsform">
+    <? setts = setts.filter(x => x[0]) ?>
+    <? for (let i = 0; i < setts.length; i++) { ?>
+    <? const type = setts[i][2] == "decimal" ?  "number" : setts[i][2] == "datalist" ? "" : setts[i][2] == "date" ? "text" : setts[i][2] ?>
+    <? const classlist = setts[i][2] == "date" ? "datepicker" : "" ?>
+    <div>
+      <label for="<?= i ?>">
+        <? if (setts[i][0] == "Telegram chat ID") { ?>
+          <a href="https://t.me/predictive_budget_bot" target="_blank">
+          <?= setts[i][0] ?></a>
+        <? } else { ?>
+          <?= setts[i][0] ?>
+        <? } ?>
+      </label>
+      
+      <span title="<?= setts[i][3] ?>" class="material-symbols-outlined inline-icon">help</span>
+      <br>
+      <? if (setts[i][2] == "datalist") { ?>
+        <select id="<?= i ?>">
+        <option disabled selected value></option>
+        </select>
+        <br>
+      <? } else { ?>
+        <input type="<?= type ?>" id="<?= i ?>" name="<?= i ?>" class="<?= classlist ?>" value="<?= setts[i][1] ?>"><br>
+      <? } ?>
+    </div>
+    <? } ?>
+
+
+    <div id="buttons">
+      <button type="submit" value="Submit" class="btn waves-effect waves-light">Submit</button>
+      <button value="Reset" class="btn waves-effect waves-light" onclick="event.preventDefault(); resetToDefaults()">Reset to defaults</button>
+    </div>
+
+  </form>
+
+
+</html>

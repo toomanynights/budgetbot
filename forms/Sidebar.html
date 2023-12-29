@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <base target="_top" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+
+  <style>
+    .row {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-flow: column;
+      height: 90vh;
+    }
+
+    btn {
+      margin: auto;
+      float: none;
+    }
+
+    span {
+      font-style: italic;
+      font-size: smaller;
+    }
+
+    body {
+      display: flex;
+    }
+
+    .overlay {
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      position: fixed;
+      background: #222;
+      opacity: .6;
+      z-index: 2;
+    }
+
+    .overlay__inner {
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      position: absolute;
+    }
+
+    .overlay__content {
+      left: 50%;
+      position: absolute;
+      top: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    .spinner {
+      width: 75px;
+      height: 75px;
+      display: inline-block;
+      border-width: 2px;
+      border-color: rgba(255, 255, 255, 0.05);
+      border-top-color: #fff;
+      animation: spin 1s infinite linear;
+      border-radius: 100%;
+      border-style: solid;
+    }
+
+    @keyframes spin {
+      100% {
+        transform: rotate(360deg);
+      }
+    }
+  </style>
+
+</head>
+
+<body>
+
+  <script>
+    
+    function toggleOverlay() {
+        const overlay = document.getElementById("overlay-parent");
+
+          if (overlay.style.display == "none") {
+            overlay.style.display = "block";
+          } else {
+            overlay.style.display = "none";
+          }
+        //google.script.host.close()
+    }
+
+    function reCalcPreds() {
+      setTimeout(function(){
+          try {
+            google.script.run.withFailureHandler(onFailure).withSuccessHandler(removeCache).reCalcPredictions();
+          } catch(e) {
+            toggleOverlay();
+            M.toast({html: e, displayLength: 3000})
+          }
+      }, 1000);
+    }
+
+    function onFailure(e) {
+      toggleOverlay();
+      M.toast({html: e, displayLength: 3000});
+    }
+
+
+    function removeCache(returnedValue) {
+      if (returnedValue) {
+        try {
+          google.script.run.withFailureHandler(onFailure).withSuccessHandler(closeSidebar).toggleSidebarOpened();
+        } catch(e) {
+          toggleOverlay();
+          M.toast({html: e, displayLength: 3000})
+        }
+      } else {
+        toggleOverlay();
+        M.toast({html: "Nothing to recalculate.", displayLength: 1000})
+      }
+    }
+
+    function closeSidebar(returnedValue) {
+     if (returnedValue) {
+        google.script.host.close();
+      }
+    }
+
+  </script>
+
+  <div class="overlay" id="overlay-parent" style="display: none;">
+    <div class="overlay__inner">
+      <div class="overlay__content"><span class="spinner"></span></div>
+    </div>
+  </div>
+  <div class="row">
+    <button id="btn" class="btn waves-effect waves-light" onclick="toggleOverlay(); reCalcPreds()">Apply changes</button>
+    <br>
+    <span>They also get applied automatically after some time</span>
+  </div>
+
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+
+</body>
+
+</html>
