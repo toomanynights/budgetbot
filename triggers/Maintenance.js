@@ -52,6 +52,7 @@ function predictionReminder(predsObj, timezone, chatId) {
   const overduePreds = preds[1];
   const todayPredsValues = Object.values(todayPreds);
   const overduePredsValues = Object.values(overduePreds);
+  if (!timezone) {timezone = getSpreadSheet().getSpreadsheetTimeZone()}
 
   const state = todayPredsValues.length + overduePredsValues.length;
   if (!state) {console.log("No predictions to remind about"); return};
@@ -67,7 +68,8 @@ function predictionReminder(predsObj, timezone, chatId) {
   if (overduePredsValues.length) {
     text = text + "\nSome predictions are overdue:\n"
     for (let i = 0; i < overduePredsValues.length; i++) {
-      const currPred = overduePreds[i];
+      let currPred = overduePreds[i];
+      if (!predsObj) {currPred.date = toUsersTimezone(currPred.date, "", timezone)}
       text = text + "• <b>" + currPred.name + "</b>: " + currPred.sum + " (" + currPred.date + ")\n";
     }
   }
